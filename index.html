@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111111" />
+    <title>TACTA sijoitusprototyyppi</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="toolbar" aria-label="Kortin valinta">
+        <div>
+          <h1>TACTA</h1>
+          <p>Valitse kädestä kortin kuvio, peilaa tai käännä korttia tarvittaessa, ja klikkaa aloituskortista vastaavaa kuviota.</p>
+        </div>
+        <div class="controls" aria-label="Sijoitettavan kortin säätimet">
+          <button id="flip-card" type="button">Peilaa</button>
+          <button id="rotate-left" type="button">Käännä vasemmalle</button>
+          <button id="rotate-right" type="button">Käännä oikealle</button>
+          <button id="place-center" type="button">Aseta vapaasti</button>
+          <button id="clear-board" type="button">Palauta alkuun</button>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <aside class="hand" aria-label="Kuusi korttimallia">
+          <div class="hand-header">
+            <h2>Kuusi korttia</h2>
+            <span id="selected-status">Valitse kuvio</span>
+          </div>
+          <div id="hand-cards" class="hand-cards"></div>
+        </aside>
+
+        <section class="board-wrap" aria-label="Pelialue">
+          <div id="board" class="board">
+            <svg id="placement-lines" class="placement-lines" aria-hidden="true"></svg>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="game.js"></script>
+  </body>
+</html>
