@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#101214" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="TACTA" />
+    <title>TACTA</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/icon-180.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="topbar">
+        <div>
+          <h1>TACTA</h1>
+          <p id="status">Ladataan korttirakenteita...</p>
+        </div>
+        <button id="new-game" type="button">Uusi peli</button>
+      </header>
+
+      <section id="setup-screen" class="setup-screen">
+        <section class="setup-card">
+          <h2>Uusi peli</h2>
+          <label class="field">
+            <span>Pelaajia</span>
+            <select id="player-count">
+              <option value="2" selected>2 pelaajaa</option>
+              <option value="3">3 pelaajaa</option>
+              <option value="4">4 pelaajaa</option>
+              <option value="5">5 pelaajaa</option>
+              <option value="6">6 pelaajaa</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Pelimuoto</span>
+            <select id="game-mode">
+              <option value="standard" selected>Tavallinen</option>
+              <option value="limited-2">Limited Space: kaksi maata</option>
+              <option value="limited-1">Limited Space: yksi maa</option>
+              <option value="sabotage">Sabotage: kaksi pelaajaa</option>
+            </select>
+          </label>
+          <button id="start-game" type="button">Aloita</button>
+        </section>
+      </section>
+
+      <section id="pass-screen" class="setup-screen is-hidden">
+        <section class="setup-card pass-card">
+          <h2 id="pass-title">Seuraava vuoro</h2>
+          <p id="pass-text">Anna iPad seuraavalle pelaajalle.</p>
+          <button id="begin-turn" type="button">Aloita vuoro</button>
+        </section>
+      </section>
+
+      <section id="play-screen" class="layout is-hidden">
+        <aside class="side-panel" aria-label="Vuorossa oleva pelaaja">
+          <div id="player-strip" class="player-strip" aria-label="Pelaajat ja pisteet"></div>
+
+          <section class="panel hand-panel">
+            <div class="panel-heading">
+              <h2>Kädessä</h2>
+              <button id="free-place" type="button">Aseta vapaasti</button>
+            </div>
+            <div id="hand-cards" class="hand-cards"></div>
+          </section>
+        </aside>
+
+        <section class="board-wrap" aria-label="Pelialue">
+          <div id="board" class="board"></div>
+        </section>
+      </section>
+
+      <section id="score-screen" class="score-screen is-hidden">
+        <section class="setup-card">
+          <h2>Peli päättyi</h2>
+          <div id="score-list" class="score-list"></div>
+          <button id="play-again" type="button">Pelaa uudelleen</button>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>

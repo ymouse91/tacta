@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101214" />
+    <title>TACTA korttirakenne-editori</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>TACTA korttirakenne-editori</h1>
+          <p>Maarakenne 3 x 6 kortille. Värit käyttävät samaa loogista korttisarjaa.</p>
+        </div>
+        <div class="top-actions" aria-label="Tietorakenteen toiminnot">
+          <button id="copy-json" type="button">Kopioi JSON</button>
+          <button id="download-json" type="button">Lataa JSON</button>
+          <button id="reset-card" type="button">Tyhjennä kortti</button>
+          <button id="reset-all" type="button">Tyhjennä kaikki</button>
+        </div>
+      </header>
+
+      <section class="layout">
+        <aside class="sidebar" aria-label="Kortin valinta">
+          <div class="panel">
+            <div class="panel-heading">
+              <h2>Kortit</h2>
+              <span id="completion-count">0 / 18</span>
+            </div>
+            <div id="card-grid" class="card-grid"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-heading">
+              <h2>Valittu</h2>
+            </div>
+            <dl class="selected-meta">
+              <div>
+                <dt>Maa</dt>
+                <dd id="selected-suit">-</dd>
+              </div>
+              <div>
+                <dt>Arvo</dt>
+                <dd id="selected-value">-</dd>
+              </div>
+              <div>
+                <dt>Pisteet</dt>
+                <dd id="selected-dots">0 / 6</dd>
+              </div>
+              <div>
+                <dt>Elementit</dt>
+                <dd id="selected-elements">0 / 18</dd>
+              </div>
+            </dl>
+          </div>
+        </aside>
+
+        <section class="editor" aria-label="Kortin muokkaus">
+          <section class="preview-panel">
+            <div class="panel-heading">
+              <h2 id="preview-title">Kortti</h2>
+              <div class="view-controls" aria-label="Kortin puoli">
+                <button id="front-view" class="is-active" type="button">Etupuoli</button>
+                <button id="back-view" type="button">Peilipuoli</button>
+              </div>
+            </div>
+            <div class="preview-stage">
+              <svg id="card-preview" class="card-preview" viewBox="-18 -18 276 396" role="img" aria-label="Kortin esikatselu"></svg>
+            </div>
+          </section>
+
+          <section class="elements-panel">
+            <div class="panel-heading">
+              <h2>Elementit</h2>
+              <span>Aktivoi paikka ja anna pisteet</span>
+            </div>
+            <div id="element-list" class="element-list"></div>
+          </section>
+        </section>
+
+        <aside class="json-panel" aria-label="Tietorakenne">
+          <div class="panel-heading">
+            <h2>JSON</h2>
+            <span id="save-status">Tallennettu selaimeen</span>
+          </div>
+          <textarea id="json-output" spellcheck="false" aria-label="Korttirakenteen JSON"></textarea>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="game.js"></script>
+  </body>
+</html>

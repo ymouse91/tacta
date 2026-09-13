@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="TACTA">
+  <rect width="512" height="512" rx="96" fill="#101214"/>
+  <path d="M92 92h328v328H92z" fill="#161b20" stroke="#f3f6f8" stroke-width="18"/>
+  <path d="M92 92h164v164H92z" fill="#66c9ff" opacity=".34"/>
+  <path d="M256 92h164v164H256z" fill="#71d43d" opacity=".34"/>
+  <path d="M92 256h164v164H92z" fill="#ffad2e" opacity=".34"/>
+  <path d="M256 256h164v164H256z" fill="#ff3dac" opacity=".34"/>
+  <path d="M92 92l328 328M420 92 92 420M256 92v328M92 256h328" stroke="#f3f6f8" stroke-width="12" stroke-linecap="round" opacity=".82"/>
+  <circle cx="166" cy="166" r="14" fill="#f3f6f8"/>
+  <circle cx="346" cy="166" r="14" fill="#f3f6f8"/>
+  <circle cx="166" cy="346" r="14" fill="#f3f6f8"/>
+  <circle cx="346" cy="346" r="14" fill="#f3f6f8"/>
+  <rect x="178" y="178" width="156" height="156" rx="28" fill="#f3f6f8"/>
+  <text x="256" y="278" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="800" fill="#101214">T</text>
+</svg>
