@@ -8,9 +8,11 @@ const TRIANGLE_LEG = EDGE_THICKNESS * Math.SQRT2;
 const EDGE_TRIANGLE_BASE = CORNER_SQUARE_SIZE;
 const BOARD_CENTER = { x: 2100, y: 1600 };
 const BOARD_CARD_SCALE = 0.4;
-const APP_VERSION = "v0.1.1-large-board";
+const APP_VERSION = "v0.1.3";
+const AI_TURN_DELAY_MS = 3000;
+const AI_MOVE_DELAY_MS = 700;
 const TARGET_OVERLAP_TOLERANCE = 90;
-const NON_TARGET_OVERLAP_TOLERANCE = 180;
+const NON_TARGET_OVERLAP_TOLERANCE = 120;
 const ELEMENT_OVERLAP_TOLERANCE = 18;
 const FREE_PLACE_GAP = 18;
 
@@ -70,6 +72,7 @@ const labels = {
 let baseCardSet = null;
 let game = null;
 let selected = { handSide: null, ownElementId: null, targetPlacementId: null, targetElementId: null };
+let aiTurnTimer = null;
 
 const setupScreen = document.querySelector("#setup-screen");
 const passScreen = document.querySelector("#pass-screen");
@@ -78,8 +81,10 @@ const scoreScreen = document.querySelector("#score-screen");
 const statusEl = document.querySelector("#status");
 const playerCountEl = document.querySelector("#player-count");
 const gameModeEl = document.querySelector("#game-mode");
+const aiCountEl = document.querySelector("#ai-count");
 const startGameButton = document.querySelector("#start-game");
 const newGameButton = document.querySelector("#new-game");
+const inspectBoardButton = document.querySelector("#inspect-board");
 const playAgainButton = document.querySelector("#play-again");
 const beginTurnButton = document.querySelector("#begin-turn");
 const passTitle = document.querySelector("#pass-title");
@@ -93,10 +98,12 @@ const scoreList = document.querySelector("#score-list");
 
 startGameButton.addEventListener("click", startGame);
 newGameButton.addEventListener("click", showSetup);
+inspectBoardButton.addEventListener("click", inspectBoard);
 playAgainButton.addEventListener("click", showSetup);
 beginTurnButton.addEventListener("click", beginTurn);
 freePlaceButton.addEventListener("click", freePlaceSelectedCard);
 gameModeEl.addEventListener("change", updateSetupControls);
+playerCountEl.addEventListener("change", updateSetupControls);
 initBoardDragging();
 updateSetupControls();
 
@@ -119,6 +126,16 @@ function updateSetupControls() {
   } else {
     playerCountEl.disabled = false;
   }
+
+  const playerCount = Number(playerCountEl.value);
+  const previousAiCount = Math.min(Number(aiCountEl.value || 0), playerCount);
+  aiCountEl.replaceChildren(...Array.from({ length: playerCount + 1 }, (_, count) => {
+    const option = document.createElement("option");
+    option.value = String(count);
+    option.textContent = count === 1 ? "1 AI-pelaaja" : `${count} AI-pelaajaa`;
+    if (count === previousAiCount) option.selected = true;
+    return option;
+  }));
 }
 
 function initBoardDragging() {
@@ -191,6 +208,7 @@ async function loadCardStructures() {
 }
 
 function startGame() {
+  clearAiTurnTimer();
   const setup = readSetup();
   const players = setup.playerColors.map((color, index) => ({
     id: color.id,
@@ -198,6 +216,7 @@ function startGame() {
     color,
     deck: shuffle(buildDeckForPlayer(color, index, setup)),
     order: index,
+    isAi: index >= setup.playerColors.length - setup.aiCount,
   }));
 
   game = {
@@ -214,13 +233,16 @@ function startGame() {
   scoreScreen.classList.add("is-hidden");
   renderAll();
   showPassScreen("Aloittava pelaaja");
+  centerBoard();
 }
 
 function readSetup() {
   const mode = gameModeEl.value;
   const playerCount = mode === "sabotage" ? 2 : Number(playerCountEl.value);
+  const aiCount = Math.min(Number(aiCountEl.value || 0), playerCount);
   return {
     mode,
+    aiCount,
     playerColors: playerColors.slice(0, playerCount),
     includedSuits: includedSuitIdsForMode(mode),
   };
@@ -238,6 +260,7 @@ function randomSuitIds(count) {
 }
 
 function showSetup() {
+  clearAiTurnTimer();
   setupScreen.classList.remove("is-hidden");
   passScreen.classList.add("is-hidden");
   playScreen.classList.add("is-hidden");
@@ -246,21 +269,35 @@ function showSetup() {
 }
 
 function showPassScreen(prefix = "Seuraava vuoro") {
-  passTitle.textContent = `${prefix}: ${currentPlayer().name}`;
-  passText.textContent = `Anna iPad pelaajalle ${currentPlayer().name}.`;
+  clearAiTurnTimer();
+  const player = currentPlayer();
+  passTitle.textContent = `${player.isAi ? "Tekoälyn vuoro" : prefix}: ${player.name}`;
+  passText.textContent = player.isAi
+    ? "Tekoäly miettii seuraavaa siirtoa."
+    : `Anna iPad pelaajalle ${player.name}.`;
+  beginTurnButton.classList.toggle("is-hidden", player.isAi);
   setupScreen.classList.add("is-hidden");
   scoreScreen.classList.add("is-hidden");
   playScreen.classList.remove("is-hidden");
   passScreen.classList.remove("is-hidden");
-  setStatus(`${currentPlayer().name} valmistautuu vuoroon.`);
+  setStatus(player.isAi ? `${player.name} pelaa kohta automaattisesti.` : `${player.name} valmistautuu vuoroon.`);
+  if (player.isAi) {
+    aiTurnTimer = window.setTimeout(beginTurn, AI_TURN_DELAY_MS);
+  }
 }
 
 function beginTurn() {
+  clearAiTurnTimer();
   passScreen.classList.add("is-hidden");
   playScreen.classList.remove("is-hidden");
-  setStatus(`${currentPlayer().name}: valitse toinen kahdesta ulommaisesta kortista.`);
+  const player = currentPlayer();
+  setStatus(player.isAi
+    ? `${player.name} valitsee siirtoa.`
+    : `${player.name}: valitse toinen kahdesta ulommaisesta kortista.`);
   renderAll();
-  centerBoard();
+  if (player.isAi) {
+    aiTurnTimer = window.setTimeout(playAiTurn, AI_MOVE_DELAY_MS);
+  }
 }
 
 function buildDeckForPlayer(color, playerIndex, setup) {
@@ -316,7 +353,7 @@ function renderPlayers() {
     const row = document.createElement("div");
     row.className = "player-row";
     if (index === game.currentPlayerIndex) row.classList.add("is-current");
-    row.innerHTML = `<span class="swatch" style="--player-color:${item.color.css}"></span><strong>${item.name}</strong><span>${scores[item.id] || 0} p / ${item.deck.length}</span>`;
+    row.innerHTML = `<span class="swatch" style="--player-color:${item.color.css}"></span><strong>${item.name}${item.isAi ? " AI" : ""}</strong><span>${scores[item.id] || 0} p / ${item.deck.length}</span>`;
     return row;
   }));
 }
@@ -345,7 +382,9 @@ function renderHand() {
     const flip = document.createElement("button");
     flip.type = "button";
     flip.textContent = outer.flipped ? "Peilattu" : "Peilaa";
+    flip.disabled = player.isAi;
     flip.addEventListener("click", () => {
+      if (currentPlayer().isAi) return;
       outer.card.flipped = !outer.flipped;
       selectHandCard(outer.side);
       renderAll();
@@ -425,7 +464,9 @@ function renderCardSvg({ card, mode, color, flipped, placementId }) {
 
     if (mode === "board") {
       const own = selected.ownElementId ? getDefinition(selected.ownElementId) : null;
-      const compatible = Boolean(own && enabled && areCompatible(own, definition));
+      const targetPlacement = game.placements.find((placement) => placement.id === placementId);
+      const available = targetPlacement && targetElementIsAvailable(targetPlacement, definition);
+      const compatible = Boolean(own && enabled && available && areCompatible(own, definition));
       if (!own || compatible) {
         hitShapes.push(drawHitShape(definition, {
           selected: selected.targetPlacementId === placementId && selected.targetElementId === definition.id,
@@ -442,6 +483,7 @@ function renderCardSvg({ card, mode, color, flipped, placementId }) {
 }
 
 function selectHandCard(side) {
+  if (currentPlayer().isAi) return;
   selected.handSide = side;
   selected.ownElementId = null;
   selected.targetPlacementId = null;
@@ -451,6 +493,7 @@ function selectHandCard(side) {
 }
 
 function selectOwnElement(card, elementId) {
+  if (currentPlayer().isAi) return;
   const outer = selectedCard();
   if (!outer || outer.instanceId !== card.instanceId) {
     selected.handSide = sideForVisibleCard(card.instanceId);
@@ -463,6 +506,7 @@ function selectOwnElement(card, elementId) {
 }
 
 function placeSelectedCard(targetPlacementId, targetElementId) {
+  if (currentPlayer().isAi) return;
   const handCard = selectedCard();
   if (!handCard || !selected.ownElementId) {
     setStatus("Valitse ensin kortti ja siitä elementti.");
@@ -488,6 +532,10 @@ function placeSelectedCard(targetPlacementId, targetElementId) {
 }
 
 function solvePlacement(handCard, ownDefinition, targetPlacement, targetDefinition) {
+  if (!targetElementIsAvailable(targetPlacement, targetDefinition)) {
+    throw new Error("kohde-elementti on jo peitossa");
+  }
+
   const targetWorldPoints = geometryPoints(targetDefinition.geometry).map((point) => localToWorld(point, targetPlacement));
   const targetCenter = pointsCenter(targetWorldPoints);
   const targetDirection = worldDirection(elementDirection(targetDefinition), targetPlacement.rotation, targetPlacement.flipped);
@@ -539,6 +587,7 @@ function commitPlacement(placement) {
 }
 
 function freePlaceSelectedCard() {
+  if (currentPlayer().isAi) return;
   const handCard = selectedCard();
   if (!handCard) {
     setStatus("Valitse ensin kortti.");
@@ -576,6 +625,7 @@ function removeSelectedCardFromDeck() {
 }
 
 function advanceTurn() {
+  clearAiTurnTimer();
   game.currentPlayerIndex = (game.currentPlayerIndex + 1) % game.players.length;
   game.turn += 1;
   renderAll();
@@ -583,6 +633,7 @@ function advanceTurn() {
 }
 
 function showScores() {
+  clearAiTurnTimer();
   passScreen.classList.add("is-hidden");
   playScreen.classList.remove("is-hidden");
   scoreScreen.classList.remove("is-hidden");
@@ -605,13 +656,179 @@ function showScores() {
   setStatus("Peli päättyi. Pisteet ovat näkyvissä olevat omat pisteet.");
 }
 
+function inspectBoard() {
+  scoreScreen.classList.add("is-hidden");
+  setStatus("Peli päättyi. Voit tarkastella pelilautaa vapaasti.");
+}
+
 function renderState() {
   const outer = selectedCard();
   const legalMoveExists = hasAnyLegalMoveForCurrentPlayer();
-  freePlaceButton.disabled = !outer || legalMoveExists;
+  freePlaceButton.disabled = currentPlayer().isAi || !outer || legalMoveExists;
   freePlaceButton.title = legalMoveExists
     ? "Vapaa sijoitus sallitaan vain, jos kummallakaan näkyvällä kortilla ei ole laillista siirtoa."
     : "Sijoita valittu kortti erilleen muista korteista.";
+}
+
+function playAiTurn() {
+  clearAiTurnTimer();
+  if (!game || !currentPlayer().isAi || isGameOver()) return;
+
+  const move = chooseAiMove();
+  if (!move) {
+    setStatus(`${currentPlayer().name}: siirtoa ei löytynyt.`);
+    advanceTurn();
+    return;
+  }
+
+  selected = {
+    handSide: move.side,
+    ownElementId: move.ownElementId || null,
+    targetPlacementId: move.targetPlacementId || null,
+    targetElementId: move.targetElementId || null,
+  };
+
+  const handCard = selectedCard();
+  if (!handCard) {
+    advanceTurn();
+    return;
+  }
+  handCard.flipped = move.flipped;
+
+  if (move.kind === "free") {
+    const freeSpot = findFreePlacementSpot(handCard);
+    if (!freeSpot) {
+      setStatus(`${currentPlayer().name}: vapaata paikkaa ei löytynyt.`);
+      advanceTurn();
+      return;
+    }
+    setStatus(`${currentPlayer().name} asetti kortin vapaasti.`);
+    const placement = {
+      id: `free-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      card: handCard,
+      playerId: currentPlayer().id,
+      colorCss: handCard.colorCss,
+      x: freeSpot.x,
+      y: freeSpot.y,
+      rotation: 0,
+      flipped: handCard.flipped,
+      attachedTo: null,
+    };
+    commitPlacement(placement);
+    centerBoardOnPlacement(placement);
+    return;
+  }
+
+  const targetPlacement = game.placements.find((placement) => placement.id === move.targetPlacementId);
+  const ownDefinition = getDefinition(move.ownElementId);
+  const targetDefinition = getDefinition(move.targetElementId);
+  try {
+    setStatus(`${currentPlayer().name} pelasi kortin ${handCard.value}.`);
+    const placement = solvePlacement(handCard, ownDefinition, targetPlacement, targetDefinition);
+    commitPlacement(placement);
+    centerBoardOnPlacement(placement);
+  } catch (error) {
+    setStatus(`${currentPlayer().name}: ${error.message}`);
+    advanceTurn();
+  }
+}
+
+function chooseAiMove() {
+  const legalMoves = allLegalMovesForCurrentPlayer();
+  if (legalMoves.length > 0) {
+    return legalMoves
+      .map((move) => ({ ...move, score: scoreAiMove(move) }))
+      .sort((a, b) => b.score - a.score)[0];
+  }
+  return chooseAiFreeMove();
+}
+
+function allLegalMovesForCurrentPlayer() {
+  const moves = [];
+  for (const outer of outerCards(currentPlayer().deck)) {
+    for (const flipped of [false, true]) {
+      const testCard = { ...outer.card, flipped };
+      for (const ownDefinition of elementDefinitions) {
+        const ownElement = getCardElement(testCard, ownDefinition.id);
+        if (!ownElement.enabled) continue;
+        for (const targetPlacement of game.placements) {
+          for (const targetDefinition of elementDefinitions) {
+            const targetElement = getCardElement(targetPlacement.card, targetDefinition.id);
+            const targetEnabled = targetPlacement.card.id === "starting-card" || targetElement.enabled;
+            if (!targetEnabled || !areCompatible(ownDefinition, targetDefinition)) continue;
+            try {
+              const placement = solvePlacement(testCard, ownDefinition, targetPlacement, targetDefinition);
+              moves.push({
+                kind: "legal",
+                side: outer.side,
+                flipped,
+                card: testCard,
+                placement,
+                ownElementId: ownDefinition.id,
+                targetPlacementId: targetPlacement.id,
+                targetElementId: targetDefinition.id,
+              });
+            } catch {
+              // Other orientations or targets may still be legal.
+            }
+          }
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+function scoreAiMove(move) {
+  const player = currentPlayer();
+  const before = visibleScores();
+  const after = visibleScoresForPlacements([...game.placements, move.placement]);
+  const ownDelta = (after[player.id] || 0) - (before[player.id] || 0);
+  const opponentDelta = opponentScoreTotal(after, player.id) - opponentScoreTotal(before, player.id);
+  const targetPlacement = game.placements.find((placement) => placement.id === move.targetPlacementId);
+  const targetElement = targetPlacement ? getCardElement(targetPlacement.card, move.targetElementId) : { dots: 0 };
+  const ownElement = getCardElement(move.card, move.ownElementId);
+  const targetOwner = targetPlacement?.card.colorId || null;
+  const targetDots = targetElement.enabled ? targetElement.dots : 0;
+  const ownElementDots = ownElement.enabled ? ownElement.dots : 0;
+  const coversOpponentDots = targetOwner && targetOwner !== player.id ? targetDots : 0;
+  const coversOwnDots = targetOwner === player.id ? targetDots : 0;
+  const placedOpponentDots = move.card.colorId !== player.id ? ownElementDots : 0;
+
+  return (
+    ownDelta * 14
+    - opponentDelta * 12
+    + coversOpponentDots * 8
+    - coversOwnDots * 10
+    - placedOpponentDots * 5
+    + Math.random() * 0.05
+  );
+}
+
+function opponentScoreTotal(scores, playerId) {
+  return game.players
+    .filter((player) => player.id !== playerId)
+    .reduce((sum, player) => sum + (scores[player.id] || 0), 0);
+}
+
+function chooseAiFreeMove() {
+  const candidates = outerCards(currentPlayer().deck)
+    .flatMap((outer) => [false, true].map((flipped) => ({ ...outer, flipped })))
+    .filter(({ card, flipped }) => findFreePlacementSpot({ ...card, flipped }))
+    .map((outer) => ({
+      kind: "free",
+      side: outer.side,
+      flipped: outer.flipped,
+      score: outer.card.colorId === currentPlayer().id ? totalDots(outer.card) : -totalDots(outer.card),
+    }))
+    .sort((a, b) => b.score - a.score);
+  return candidates[0] || null;
+}
+
+function clearAiTurnTimer() {
+  if (!aiTurnTimer) return;
+  window.clearTimeout(aiTurnTimer);
+  aiTurnTimer = null;
 }
 
 function outerCards(deck) {
@@ -738,16 +955,20 @@ function totalDots(card) {
 
 function visibleScores() {
   if (!game) return {};
+  return visibleScoresForPlacements(game.placements);
+}
+
+function visibleScoresForPlacements(placements) {
   const scores = Object.fromEntries(game.players.map((player) => [player.id, 0]));
-  game.placements.forEach((placement, index) => {
+  placements.forEach((placement, index) => {
     if (!placement.card.colorId || !(placement.card.colorId in scores)) return;
-    scores[placement.card.colorId] += visibleDotsForPlacement(placement, index);
+    scores[placement.card.colorId] += visibleDotsForPlacement(placement, index, placements);
   });
   return scores;
 }
 
-function visibleDotsForPlacement(placement, placementIndex) {
-  return dotsForPlacement(placement).filter((dot) => !isCoveredByLaterCard(dot, placementIndex)).length;
+function visibleDotsForPlacement(placement, placementIndex, placements = game.placements) {
+  return dotsForPlacement(placement).filter((dot) => !isCoveredByLaterCard(dot, placementIndex, placements)).length;
 }
 
 function dotsForPlacement(placement) {
@@ -762,8 +983,8 @@ function dotsForPlacement(placement) {
   return dots;
 }
 
-function isCoveredByLaterCard(dot, placementIndex) {
-  return game.placements
+function isCoveredByLaterCard(dot, placementIndex, placements = game.placements) {
+  return placements
     .slice(placementIndex + 1)
     .some((laterPlacement) => pointInConvexPolygon(dot, cardWorldPolygon(laterPlacement)));
 }
@@ -819,8 +1040,19 @@ function touchesAnyNonTargetCard(candidate, targetPlacementId) {
     if (dotsCoveredByPolygon(movingPolygon, placement)) return true;
     if (activeElementsOverlap(movingElements, placement)) return true;
     const cardOverlapArea = polygonArea(convexPolygonIntersection(movingPolygon, cardWorldPolygon(placement)));
-    return cardOverlapArea > NON_TARGET_OVERLAP_TOLERANCE && dotsCoveredByPolygon(cardWorldPolygon(placement), candidate);
+    return cardOverlapArea > NON_TARGET_OVERLAP_TOLERANCE;
   });
+}
+
+function targetElementIsAvailable(targetPlacement, targetDefinition) {
+  const placementIndex = game.placements.findIndex((placement) => placement.id === targetPlacement.id);
+  if (placementIndex < 0) return false;
+  const targetPolygon = geometryPoints(targetDefinition.geometry).map((point) => localToWorld(point, targetPlacement));
+  return game.placements
+    .slice(placementIndex + 1)
+    .every((laterPlacement) => (
+      polygonArea(convexPolygonIntersection(targetPolygon, cardWorldPolygon(laterPlacement))) <= NON_TARGET_OVERLAP_TOLERANCE
+    ));
 }
 
 function targetOverlapStaysInsideElement(candidate, targetPlacement, targetElementPolygon) {
@@ -1156,10 +1388,22 @@ function suitLabel(suitId) {
 }
 
 function centerBoard() {
+  // Wait for the newly shown board layout before calculating its viewport center.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const wrap = document.querySelector(".board-wrap");
+    if (!wrap) return;
+    const left = BOARD_CENTER.x - wrap.clientWidth / 2;
+    const top = BOARD_CENTER.y - wrap.clientHeight / 2;
+    wrap.scrollTo({ left, top, behavior: "auto" });
+  }));
+}
+
+function centerBoardOnPlacement(placement) {
   requestAnimationFrame(() => {
     const wrap = document.querySelector(".board-wrap");
-    wrap.scrollLeft = BOARD_CENTER.x - wrap.clientWidth / 2;
-    wrap.scrollTop = BOARD_CENTER.y - wrap.clientHeight / 2;
+    const center = localToWorld(CENTER, placement);
+    wrap.scrollLeft = center.x - wrap.clientWidth / 2;
+    wrap.scrollTop = center.y - wrap.clientHeight / 2;
   });
 }
 
